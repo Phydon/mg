@@ -62,6 +62,7 @@ fn main() {
     let stdout = io::stdout().lock();
     let mut handle = io::BufWriter::new(stdout);
 
+    //FIXME does not work
     // handle Ctrl+C
     ctrlc::set_handler(move || {
         println!(
@@ -487,30 +488,48 @@ fn forwards_search<W: Write>(
 
                 // check if entry_extension matches any given extensions via extensions flag
                 if config.extension_ac.is_match(&entry_extension) {
-                    // TODO handle unwrap()
-                    match_pattern_and_print(
+                    if let Err(err) = match_pattern_and_print(
                         handle,
                         &entry.path().to_path_buf(),
                         &config,
                         pb.clone(),
                         search_hits,
-                    )
-                    .unwrap();
+                    ) {
+                        match err.kind() {
+                            io::ErrorKind::Interrupted => {
+                                println!("{err}");
+                                process::exit(0)
+                            }
+                            _ => {
+                                // println!("{err}");
+                                continue;
+                            }
+                        }
+                    }
                 }
                 // TODO is this really faster than
                 // if extensions.iter().any(|&it| &entry_extension == it) {...}
                 // -> with extensions stored in a Vec
             }
         } else {
-            // TODO handle unwrap()
-            match_pattern_and_print(
+            if let Err(err) = match_pattern_and_print(
                 handle,
                 &entry.path().to_path_buf(),
                 &config,
                 pb.clone(),
                 search_hits,
-            )
-            .unwrap();
+            ) {
+                match err.kind() {
+                    io::ErrorKind::Interrupted => {
+                        println!("{err}");
+                        process::exit(0)
+                    }
+                    _ => {
+                        // println!("{err}");
+                        continue;
+                    }
+                }
+            }
         }
     }
 
@@ -527,9 +546,7 @@ fn match_pattern_and_print<W: Write>(
     let file = File::open(path)?;
     let mut buf_reader = BufReader::new(file);
     let mut content = String::new();
-    buf_reader
-        .read_to_string(&mut content)
-        .unwrap_or_else(|_| 0 as usize);
+    buf_reader.read_to_string(&mut content)?;
 
     // check for pattern match in file via aho-corasick algorithm
     if config.pattern_ac.is_match(&content) {
