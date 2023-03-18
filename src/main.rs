@@ -527,7 +527,9 @@ fn match_pattern_and_print<W: Write>(
     let file = File::open(path)?;
     let mut buf_reader = BufReader::new(file);
     let mut content = String::new();
-    buf_reader.read_to_string(&mut content)?;
+    buf_reader
+        .read_to_string(&mut content)
+        .unwrap_or_else(|_| 0 as usize);
 
     // check for pattern match in file via aho-corasick algorithm
     if config.pattern_ac.is_match(&content) {
@@ -535,20 +537,26 @@ fn match_pattern_and_print<W: Write>(
 
         if !config.count_flag {
             if config.performance_flag {
-                writeln!(handle, "{}", format!("{}", &content)).unwrap_or_else(|err| {
-                    error!("Error writing to stdout: {err}");
-                });
-            } else {
-                // FIXME
-                match pb.clone() {
-                    Some(pb) => {
-                        let file_with_hi_pattern = highlight_pattern_in_file(&content, &config);
-                        pb.println(format!(
-                            "\n{}\n{}",
-                            path.display().to_string().bold().truecolor(59, 179, 140),
-                            file_with_hi_pattern
-                        ))
+                content.lines().for_each(|line| {
+                    if config.pattern_ac.is_match(&line) {
+                        writeln!(handle, "{}", format!("::: {}\n{}\n", path.display(), &line))
+                            .unwrap_or_else(|err| {
+                                error!("Error writing to stdout: {err}");
+                            });
                     }
+                })
+            } else {
+                match pb.clone() {
+                    Some(pb) => content.lines().for_each(|line| {
+                        if config.pattern_ac.is_match(&line) {
+                            let line_with_hi_pattern = highlight_pattern_in_line(&line, &config);
+                            pb.println(format!(
+                                "\n{}\n{}",
+                                path.display().to_string().bold().truecolor(59, 179, 140),
+                                line_with_hi_pattern
+                            ))
+                        }
+                    }),
                     None => {}
                 }
             }
@@ -590,17 +598,16 @@ fn get_search_hits(search_hits: u64, entry_count: u64, start: Instant) {
     );
 }
 
-// FIXME
-fn highlight_pattern_in_file(content: &str, config: &Config) -> String {
+fn highlight_pattern_in_line(line: &str, config: &Config) -> String {
     // find first byte of pattern in filename
-    let pat_in_file = content.find(&config.pattern).unwrap_or_else(|| 9999999999);
+    let pat_in_file = line.find(&config.pattern).unwrap_or_else(|| 9999999999);
 
     if pat_in_file == 9999999999 {
         // if no pattern found return just the filename
-        return content.to_string();
+        return line.to_string();
     } else {
-        let first_from_name = &content[..pat_in_file];
-        let last_from_name = &content[(pat_in_file + config.pattern.len())..];
+        let first_from_name = &line[..pat_in_file];
+        let last_from_name = &line[(pat_in_file + config.pattern.len())..];
         // colourize the pattern in the filename
         let highlighted_pattern = config.pattern.truecolor(112, 110, 255).to_string();
 
