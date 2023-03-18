@@ -467,18 +467,6 @@ fn forwards_search<W: Write>(
         // count searched entries
         *entry_count += 1;
 
-        // // get filename
-        // let mut name = String::new();
-        // name.push_str(&entry.file_name().to_string_lossy().to_string());
-
-        // // get parent path
-        // let parent = entry
-        //     .path()
-        //     .parent()
-        //     .unwrap_or_else(|| Path::new(""))
-        //     .to_string_lossy()
-        //     .to_string();
-
         // handle possible file extensions
         if !config.extensions.is_empty() {
             // get entry extension
@@ -497,11 +485,10 @@ fn forwards_search<W: Write>(
                     ) {
                         match err.kind() {
                             io::ErrorKind::Interrupted => {
-                                println!("{err}");
+                                warn!("Interrupted: {err}");
                                 process::exit(0)
                             }
                             _ => {
-                                // println!("{err}");
                                 continue;
                             }
                         }
@@ -521,11 +508,10 @@ fn forwards_search<W: Write>(
             ) {
                 match err.kind() {
                     io::ErrorKind::Interrupted => {
-                        println!("{err}");
+                        warn!("Interrupted: {err}");
                         process::exit(0)
                     }
                     _ => {
-                        // println!("{err}");
                         continue;
                     }
                 }
@@ -554,26 +540,40 @@ fn match_pattern_and_print<W: Write>(
 
         if !config.count_flag {
             if config.performance_flag {
-                content.lines().for_each(|line| {
+                writeln!(handle, "\n{}", format!("PATH: {}", path.display())).unwrap_or_else(
+                    |err| {
+                        error!("Error writing to stdout: {err}");
+                    },
+                );
+
+                let mut linenumber = 0;
+                for line in content.lines() {
+                    linenumber += 1;
                     if config.pattern_ac.is_match(&line) {
-                        writeln!(handle, "{}", format!("::: {}\n{}\n", path.display(), &line))
+                        writeln!(handle, "{}", format!(" {}: {}", linenumber, &line))
                             .unwrap_or_else(|err| {
                                 error!("Error writing to stdout: {err}");
                             });
                     }
-                })
+                }
             } else {
                 match pb.clone() {
-                    Some(pb) => content.lines().for_each(|line| {
-                        if config.pattern_ac.is_match(&line) {
-                            let line_with_hi_pattern = highlight_pattern_in_line(&line, &config);
-                            pb.println(format!(
-                                "\n{}\n{}",
-                                path.display().to_string().bold().truecolor(59, 179, 140),
-                                line_with_hi_pattern
-                            ))
+                    Some(pb) => {
+                        pb.println(format!(
+                            "\n{}",
+                            path.display().to_string().bold().truecolor(59, 179, 140),
+                        ));
+
+                        let mut linenumber = 0;
+                        for line in content.lines() {
+                            linenumber += 1;
+                            if config.pattern_ac.is_match(&line) {
+                                let line_with_hi_pattern =
+                                    highlight_pattern_in_line(&line, &config);
+                                pb.println(format!(" {}: {}\n", linenumber, line_with_hi_pattern,))
+                            }
                         }
-                    }),
+                    }
                     None => {}
                 }
             }
