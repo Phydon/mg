@@ -244,10 +244,12 @@ fn sf() -> Command {
             Arg::new("count")
                 .short('c')
                 .long("count")
-                .help("Only print the number of search results")
+                .help("Only print the number of search results as [files patterns]")
                 .long_help(format!(
-                    "{}\n{}",
-                    "Only print the number of search results",
+                    "{}\n{}\n{}\n{}",
+                    "Only print the number of search results as [files patterns]",
+                    "First number shown is the number of found files with the given pattern",
+                    "Second number is the number of found patterns, including multiple hits in one file",
                     "Can be combined with the --stats flag to only show stats and no other output",
                 ))
                 .action(ArgAction::SetTrue)
@@ -318,6 +320,8 @@ fn sf() -> Command {
                     "Disable search indicating spinner and don`t colourize the search output",
                     "Write the output via BufWriter",
                 ))
+                .conflicts_with("stats")
+                .conflicts_with("count")
                 .action(ArgAction::SetTrue),
         )
         .arg(
@@ -344,6 +348,7 @@ fn search<W: Write>(handle: &mut W, path: &PathBuf, config: &Config) {
     let start = Instant::now();
     let mut entry_count = 0;
     let mut search_hits = 0;
+    let mut pattern_hits = 0;
 
     // disable the search indicating spinner and colourful output
     if config.performance_flag {
@@ -352,6 +357,7 @@ fn search<W: Write>(handle: &mut W, path: &PathBuf, config: &Config) {
             path,
             &config,
             &mut search_hits,
+            &mut pattern_hits,
             &mut entry_count,
             None,
         );
@@ -368,6 +374,7 @@ fn search<W: Write>(handle: &mut W, path: &PathBuf, config: &Config) {
             path,
             &config,
             &mut search_hits,
+            &mut pattern_hits,
             &mut entry_count,
             Some(pb.clone()),
         );
@@ -377,9 +384,9 @@ fn search<W: Write>(handle: &mut W, path: &PathBuf, config: &Config) {
 
     // print output
     if config.count_flag && !config.stats_flag {
-        println!("{}", search_hits.to_string());
+        println!("{} {}", search_hits.to_string(), pattern_hits.to_string());
     } else if config.stats_flag {
-        get_search_hits(search_hits, entry_count, start);
+        get_search_hits(search_hits, pattern_hits, entry_count, start);
     }
 }
 
@@ -388,10 +395,19 @@ fn forwards_search_and_catch_errors<W: Write>(
     path: &PathBuf,
     config: &Config,
     search_hits: &mut u64,
+    pattern_hits: &mut u64,
     entry_count: &mut u64,
     pb: Option<ProgressBar>,
 ) {
-    if let Err(err) = forwards_search(handle, path, &config, search_hits, entry_count, pb.clone()) {
+    if let Err(err) = forwards_search(
+        handle,
+        path,
+        &config,
+        search_hits,
+        pattern_hits,
+        entry_count,
+        pb.clone(),
+    ) {
         match err.kind() {
             io::ErrorKind::NotFound => {
                 warn!("\'{}\' not found: {}", path.display(), err);
@@ -420,6 +436,7 @@ fn forwards_search<W: Write>(
     path: &PathBuf,
     config: &Config,
     search_hits: &mut u64,
+    pattern_hits: &mut u64,
     entry_count: &mut u64,
     pb: Option<ProgressBar>,
 ) -> io::Result<()> {
@@ -466,6 +483,7 @@ fn forwards_search<W: Write>(
                         &config,
                         pb.clone(),
                         search_hits,
+                        pattern_hits,
                     ) {
                         match err.kind() {
                             io::ErrorKind::Interrupted => {
@@ -489,6 +507,7 @@ fn forwards_search<W: Write>(
                 &config,
                 pb.clone(),
                 search_hits,
+                pattern_hits,
             ) {
                 match err.kind() {
                     io::ErrorKind::Interrupted => {
@@ -512,6 +531,7 @@ fn match_pattern_and_print<W: Write>(
     config: &Config,
     pb: Option<ProgressBar>,
     search_hits: &mut u64,
+    pattern_hits: &mut u64,
 ) -> io::Result<()> {
     let file = File::open(path)?;
     let mut buf_reader = BufReader::new(file);
@@ -522,8 +542,8 @@ fn match_pattern_and_print<W: Write>(
     if config.pattern_ac.is_match(&content) {
         *search_hits += 1;
 
-        if !config.count_flag {
-            if config.performance_flag {
+        if config.performance_flag {
+            if !config.count_flag {
                 writeln!(handle, "\n{}", format!("PATH: {}", path.display())).unwrap_or_else(
                     |err| {
                         error!("Error writing to stdout: {err}");
@@ -540,18 +560,24 @@ fn match_pattern_and_print<W: Write>(
                             });
                     }
                 }
-            } else {
-                match pb.clone() {
-                    Some(pb) => {
+            }
+        } else {
+            match pb.clone() {
+                Some(pb) => {
+                    if !config.count_flag {
                         pb.println(format!(
                             "\n{}",
                             path.display().to_string().bold().truecolor(59, 179, 140),
                         ));
+                    }
 
-                        let mut linenumber = 0;
-                        for line in content.lines() {
-                            linenumber += 1;
-                            if config.pattern_ac.is_match(&line) {
+                    let mut linenumber = 0;
+                    for line in content.lines() {
+                        linenumber += 1;
+                        if config.pattern_ac.is_match(&line) {
+                            *pattern_hits += 1;
+
+                            if !config.count_flag {
                                 let line_with_hi_pattern =
                                     highlight_pattern_in_line(&line, &config);
                                 pb.println(format!(
@@ -562,8 +588,8 @@ fn match_pattern_and_print<W: Write>(
                             }
                         }
                     }
-                    None => {}
                 }
+                None => {}
             }
         }
     }
@@ -571,7 +597,7 @@ fn match_pattern_and_print<W: Write>(
     Ok(())
 }
 
-fn get_search_hits(search_hits: u64, entry_count: u64, start: Instant) {
+fn get_search_hits(search_hits: u64, pattern_hits: u64, entry_count: u64, start: Instant) {
     println!(
         "\n{} {}",
         entry_count.to_string().dimmed(),
@@ -580,18 +606,30 @@ fn get_search_hits(search_hits: u64, entry_count: u64, start: Instant) {
 
     if search_hits == 0 {
         println!(
-            "found {} matches",
-            search_hits.to_string().truecolor(250, 0, 104).bold()
+            "{}",
+            format!(
+                "found {} files\nfound {} matches",
+                search_hits.to_string().truecolor(250, 0, 104).bold(),
+                pattern_hits.to_string().truecolor(250, 0, 104).bold()
+            )
         );
     } else if search_hits == 1 {
         println!(
-            "found {} match",
-            search_hits.to_string().truecolor(59, 179, 140).bold()
+            "{}",
+            format!(
+                "found {} file\nfound {} match",
+                search_hits.to_string().truecolor(59, 179, 140).bold(),
+                pattern_hits.to_string().truecolor(59, 179, 140).bold()
+            )
         );
     } else {
         println!(
-            "found {} matches",
-            search_hits.to_string().truecolor(59, 179, 140).bold()
+            "{}",
+            format!(
+                "found {} files\nfound {} matches",
+                search_hits.to_string().truecolor(59, 179, 140).bold(),
+                pattern_hits.to_string().truecolor(59, 179, 140).bold()
+            )
         );
     }
 
