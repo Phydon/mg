@@ -62,7 +62,6 @@ fn main() {
     let stdout = io::stdout();
     let mut handle = io::BufWriter::new(stdout);
 
-    //FIXME does not work
     // handle Ctrl+C
     ctrlc::set_handler(move || {
         println!(
@@ -212,11 +211,10 @@ fn sf() -> Command {
             "Leann Phydon <leann.phydon@gmail.com>".italic().dimmed()
         ))
         .long_about(format!(
-            "{}\n  {}\n  {}\n  {}\n  {}\n  {}\n  {}\n  {}\n  {}\n\n{}",
+            "{}\n  {}\n  {}\n  {}\n  {}\n  {}\n  {}\n  {}\n\n{}",
             "Simple pattern search in files",
             "- colourful output and search indicating spinner by default ",
-            "- filter by file, directory and file-extension",
-            "- exclude patterns from the search ",
+            "- filter by file-extension",
             "- exclude hidden files",
             "- show search statistics at the end",
             "- accepts \'.\' as current directory",
@@ -283,20 +281,6 @@ fn sf() -> Command {
                 .value_name("EXTENSIONS"),
         )
         .arg(
-            Arg::new("exclude")
-                .short('E')
-                .long("exclude")
-                .help("Enter patterns to exclude from the search")
-                .long_help(format!(
-                    "{}\n{}",
-                    "Enter patterns to exclude from the search",
-                    "Must be provided after the pattern and the search path"
-                ))
-                .action(ArgAction::Set)
-                .num_args(1..)
-                .value_name("PATTERNS"),
-        )
-        .arg(
             Arg::new("no-hidden")
                 .short('H')
                 .long("no-hidden")
@@ -320,7 +304,7 @@ fn sf() -> Command {
                     "This flag allows to disable these flags and specify new ones"
                 ))
                 // TODO if new args -> add here to this list to override if needed
-                .overrides_with_all(["stats", "extension", "exclude", "no-hidden", "performance", "count"])
+                .overrides_with_all(["stats", "extension", "no-hidden", "performance", "count"])
                 .action(ArgAction::SetTrue),
         )
         .arg(
@@ -570,7 +554,11 @@ fn match_pattern_and_print<W: Write>(
                             if config.pattern_ac.is_match(&line) {
                                 let line_with_hi_pattern =
                                     highlight_pattern_in_line(&line, &config);
-                                pb.println(format!(" {}: {}\n", linenumber, line_with_hi_pattern,))
+                                pb.println(format!(
+                                    " {}: {}\n",
+                                    linenumber.to_string().truecolor(250, 0, 104),
+                                    line_with_hi_pattern,
+                                ))
                             }
                         }
                     }
