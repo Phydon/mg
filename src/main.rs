@@ -58,8 +58,8 @@ impl Config {
 }
 
 fn main() {
-    // TODO with or without lock()??
-    let stdout = io::stdout().lock();
+    // don`t lock stdout, otherwise unable to handle ctrl-c
+    let stdout = io::stdout();
     let mut handle = io::BufWriter::new(stdout);
 
     //FIXME does not work
