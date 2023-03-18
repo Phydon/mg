@@ -542,11 +542,11 @@ fn match_pattern_and_print<W: Write>(
                 // FIXME
                 match pb.clone() {
                     Some(pb) => {
-                        let name_with_hi_pattern = highlight_pattern_in_name(&name, &config);
+                        let file_with_hi_pattern = highlight_pattern_in_file(&content, &config);
                         pb.println(format!(
-                            "{}\\{}",
-                            parent,
-                            name_with_hi_pattern.truecolor(59, 179, 140)
+                            "\n{}\n{}",
+                            path.display().to_string().bold().truecolor(59, 179, 140),
+                            file_with_hi_pattern
                         ))
                     }
                     None => {}
@@ -591,16 +591,16 @@ fn get_search_hits(search_hits: u64, entry_count: u64, start: Instant) {
 }
 
 // FIXME
-fn highlight_pattern_in_name(name: &str, config: &Config) -> String {
+fn highlight_pattern_in_file(content: &str, config: &Config) -> String {
     // find first byte of pattern in filename
-    let pat_in_name = name.find(&config.pattern).unwrap_or_else(|| 9999999999);
+    let pat_in_file = content.find(&config.pattern).unwrap_or_else(|| 9999999999);
 
-    if pat_in_name == 9999999999 {
+    if pat_in_file == 9999999999 {
         // if no pattern found return just the filename
-        return name.to_string();
+        return content.to_string();
     } else {
-        let first_from_name = &name[..pat_in_name];
-        let last_from_name = &name[(pat_in_name + config.pattern.len())..];
+        let first_from_name = &content[..pat_in_file];
+        let last_from_name = &content[(pat_in_file + config.pattern.len())..];
         // colourize the pattern in the filename
         let highlighted_pattern = config.pattern.truecolor(112, 110, 255).to_string();
 
