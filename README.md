@@ -45,7 +45,7 @@ Arguments:
 
 Options:
   -i, --case-insensitive           Search case insensitivly
-  -c, --count                      Only print the number of search results
+  -c, --count                      Only print the number of search results as [files patterns]
   -D, --depth <NUMBER>             Set max search depth [default: 250]
   -e, --extension <EXTENSIONS>...  Only search in files with the given extensions
   -H, --no-hidden                  Exclude hidden files and directories from search
@@ -76,7 +76,9 @@ Options:
           Search case insensitivly
 
   -c, --count
-          Only print the number of search results
+          Only print the number of search results as [files patterns]
+          First number shown is the number of found files with the given pattern
+          Second number is the number of found patterns, including multiple hits in one file
           Can be combined with the --stats flag to only show stats and no other output
 
   -D, --depth <NUMBER>
