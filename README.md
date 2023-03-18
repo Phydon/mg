@@ -22,7 +22,7 @@ __Mini Grep__
 
 ## Example
 
-- search for every file and directory that contains the word 'ron', excluding hidden files but including ![*.ron files](https://github.com/ron-rs/ron)
+- search for the word _test_ in all files in the current directory and print search statistics at the end
 
 ```mg test . -s```
 
