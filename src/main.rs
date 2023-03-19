@@ -16,6 +16,8 @@ use std::{
     time::{Duration, Instant},
 };
 
+const BUFFER_CAPACITY: usize = 64 * (1 << 10); // 64 KB
+
 struct Config {
     no_hidden_flag: bool,
     performance_flag: bool,
@@ -56,8 +58,7 @@ impl Config {
 
 fn main() {
     // don`t lock stdout, otherwise unable to handle ctrl-c
-    let stdout = io::stdout();
-    let mut handle = io::BufWriter::new(stdout);
+    let mut handle = io::BufWriter::with_capacity(BUFFER_CAPACITY, io::stdout());
 
     // handle Ctrl+C
     ctrlc::set_handler(move || {
@@ -465,7 +466,7 @@ fn forwards_search<W: Write>(
             if let Some(extension) = entry.path().extension() {
                 entry_extension.push_str(&extension.to_string_lossy().to_string());
 
-                // check if entry_extension matches any given extensions via extensions flag
+                // check if entry_extension matches any given extension via extensions flag
                 if config.extensions.iter().any(|it| &entry_extension == it) {
                     if let Err(err) = match_pattern_and_print(
                         handle,
@@ -521,7 +522,7 @@ fn match_pattern_and_print<W: Write>(
     pattern_hits: &mut u64,
 ) -> io::Result<()> {
     let file = File::open(path)?;
-    let mut buf_reader = BufReader::new(file);
+    let mut buf_reader = BufReader::with_capacity(BUFFER_CAPACITY, file);
     let mut content = String::new();
     buf_reader.read_to_string(&mut content)?;
 
