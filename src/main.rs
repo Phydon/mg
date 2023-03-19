@@ -25,7 +25,6 @@ struct Config {
     pattern: String,
     pattern_ac: AhoCorasick,
     extensions: Vec<String>,
-    extension_ac: AhoCorasick,
 }
 
 impl Config {
@@ -38,7 +37,6 @@ impl Config {
         pattern: &Vec<&str>,
         pattern_ac: AhoCorasick,
         extensions: Vec<&String>,
-        extension_ac: AhoCorasick,
     ) -> Self {
         let pattern = pattern[0].to_string();
         let extensions = extensions.into_iter().map(|e| e.to_string()).collect();
@@ -52,7 +50,6 @@ impl Config {
             pattern,
             pattern_ac,
             extensions,
-            extension_ac,
         }
     }
 }
@@ -150,12 +147,6 @@ fn main() {
             extensions.append(&mut ext);
         }
 
-        // store extensions in aho-corasick builder
-        // handle case-insensitive flag for extensions
-        let extensions_ac = AhoCorasickBuilder::new()
-            .ascii_case_insensitive(case_insensitive_flag)
-            .build(&extensions);
-
         // construct Config
         let config = Config::new(
             no_hidden_flag,
@@ -166,7 +157,6 @@ fn main() {
             &pattern,
             pattern_ac,
             extensions,
-            extensions_ac,
         );
 
         // start search
@@ -476,7 +466,7 @@ fn forwards_search<W: Write>(
                 entry_extension.push_str(&extension.to_string_lossy().to_string());
 
                 // check if entry_extension matches any given extensions via extensions flag
-                if config.extension_ac.is_match(&entry_extension) {
+                if config.extensions.iter().any(|it| &entry_extension == it) {
                     if let Err(err) = match_pattern_and_print(
                         handle,
                         &entry.path().to_path_buf(),
@@ -496,9 +486,6 @@ fn forwards_search<W: Write>(
                         }
                     }
                 }
-                // TODO is this really faster than
-                // if extensions.iter().any(|&it| &entry_extension == it) {...}
-                // -> with extensions stored in a Vec
             }
         } else {
             if let Err(err) = match_pattern_and_print(
