@@ -94,7 +94,7 @@ fn main() {
         .unwrap();
 
     // handle arguments
-    let matches = sf().get_matches();
+    let matches = mg().get_matches();
     let mut no_hidden_flag = matches.get_flag("no-hidden");
     let mut performance_flag = matches.get_flag("performance");
     let mut stats_flag = matches.get_flag("stats");
@@ -187,7 +187,7 @@ fn main() {
 }
 
 // build cli
-fn sf() -> Command {
+fn mg() -> Command {
     Command::new("mg")
         .bin_name("mg")
         .before_help(format!(
@@ -677,7 +677,7 @@ fn check_create_config_dir() -> io::Result<PathBuf> {
     match dirs::config_dir() {
         Some(config_dir) => {
             new_dir.push(config_dir);
-            new_dir.push("sf");
+            new_dir.push("mg");
             if !new_dir.as_path().exists() {
                 fs::create_dir(&new_dir)?;
             }
@@ -691,7 +691,7 @@ fn check_create_config_dir() -> io::Result<PathBuf> {
 }
 
 fn show_log_file(config_dir: &PathBuf) -> io::Result<String> {
-    let log_path = Path::new(&config_dir).join("sf.log");
+    let log_path = Path::new(&config_dir).join("mg.log");
     match log_path.try_exists()? {
         true => {
             return Ok(format!(
