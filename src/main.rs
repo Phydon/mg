@@ -27,6 +27,7 @@ struct Config {
     pattern: String,
     pattern_ac: AhoCorasick,
     extensions: Vec<String>,
+    show_errors_flag: bool,
 }
 
 impl Config {
@@ -39,6 +40,7 @@ impl Config {
         pattern: &Vec<&str>,
         pattern_ac: AhoCorasick,
         extensions: Vec<&String>,
+        show_errors_flag: bool,
     ) -> Self {
         let pattern = pattern[0].to_string();
         let extensions = extensions.into_iter().map(|e| e.to_string()).collect();
@@ -52,6 +54,7 @@ impl Config {
             pattern,
             pattern_ac,
             extensions,
+            show_errors_flag,
         }
     }
 }
@@ -100,6 +103,7 @@ fn main() {
     let mut stats_flag = matches.get_flag("stats");
     let mut count_flag = matches.get_flag("count");
     let mut case_insensitive_flag = matches.get_flag("case-insensitive");
+    let mut show_errors_flag = matches.get_flag("show-errors");
     let override_flag = matches.get_flag("override");
 
     // set default search depth
@@ -122,6 +126,7 @@ fn main() {
         count_flag = false;
         depth_flag = 250;
         case_insensitive_flag = false;
+        show_errors_flag = false;
     }
 
     if let Some(args) = matches
@@ -158,6 +163,7 @@ fn main() {
             &pattern,
             pattern_ac,
             extensions,
+            show_errors_flag,
         );
 
         // start search
@@ -214,7 +220,7 @@ fn mg() -> Command {
             "Note: every set filter slows down the search".truecolor(250, 0, 104)
         ))
         // TODO update version
-        .version("1.1.1")
+        .version("1.2.0")
         .author("Leann Phydon <leann.phydon@gmail.com>")
         .arg_required_else_help(true)
         .arg(
@@ -297,7 +303,7 @@ fn mg() -> Command {
                     "This flag allows to disable these flags and specify new ones"
                 ))
                 // TODO if new args -> add here to this list to override if needed
-                .overrides_with_all(["stats", "extension", "no-hidden", "performance", "count"])
+                .overrides_with_all(["stats", "extension", "no-hidden", "performance", "count", "show-errors"])
                 .action(ArgAction::SetTrue),
         )
         .arg(
@@ -314,6 +320,19 @@ fn mg() -> Command {
                 .conflicts_with("stats")
                 .conflicts_with("count")
                 .action(ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new("show-errors")
+                .long("show-errors")
+                .help("Show possible filesystem errors")
+                .long_help(format!(
+                    "{}\n{}\n{}",
+                    "Show possible filesystem errors",
+                    "For example for situations such as insufficient permissions",
+                    "Cannot be set together with the --stats flag",
+                ))
+                .action(ArgAction::SetTrue)
+                .conflicts_with("stats"),
         )
         .arg(
             Arg::new("stats")
@@ -338,18 +357,20 @@ fn mg() -> Command {
 fn search<W: Write>(handle: &mut W, path: &PathBuf, config: &Config) {
     let start = Instant::now();
     let mut entry_count = 0;
+    let mut error_count = 0;
     let mut search_hits = 0;
     let mut pattern_hits = 0;
 
     // disable the search indicating spinner and colourful output
     if config.performance_flag {
-        forwards_search_and_catch_errors(
+        forwards_search(
             handle,
             path,
             &config,
             &mut search_hits,
             &mut pattern_hits,
             &mut entry_count,
+            &mut error_count,
             None,
         );
     } else {
@@ -360,66 +381,26 @@ fn search<W: Write>(handle: &mut W, path: &PathBuf, config: &Config) {
         pb.set_style(spinner_style);
         pb.set_message(format!("{}", "searching".truecolor(250, 0, 104)));
 
-        forwards_search_and_catch_errors(
+        forwards_search(
             handle,
             path,
             &config,
             &mut search_hits,
             &mut pattern_hits,
             &mut entry_count,
+            &mut error_count,
             Some(pb.clone()),
         );
 
         pb.finish_and_clear();
     }
 
-    // print output
+    // print output >> stats or count
     if config.count_flag && !config.stats_flag {
         println!("{} {}", search_hits.to_string(), pattern_hits.to_string());
     } else if config.stats_flag {
-        get_search_hits(search_hits, pattern_hits, entry_count, start);
+        get_search_hits(search_hits, pattern_hits, entry_count, error_count, start);
     }
-}
-
-fn forwards_search_and_catch_errors<W: Write>(
-    handle: &mut W,
-    path: &PathBuf,
-    config: &Config,
-    search_hits: &mut u64,
-    pattern_hits: &mut u64,
-    entry_count: &mut u64,
-    pb: Option<ProgressBar>,
-) {
-    if let Err(err) = forwards_search(
-        handle,
-        path,
-        &config,
-        search_hits,
-        pattern_hits,
-        entry_count,
-        pb.clone(),
-    ) {
-        match err.kind() {
-            io::ErrorKind::NotFound => {
-                warn!("\'{}\' not found: {}", path.display(), err);
-            }
-            io::ErrorKind::PermissionDenied => {
-                warn!(
-                    "You don`t have access to a source in \'{}\': {}",
-                    path.display(),
-                    err
-                );
-            }
-            _ => {
-                error!(
-                    "Error while scanning entries for {} in \'{}\': {}",
-                    config.pattern.italic(),
-                    path.display(),
-                    err
-                );
-            }
-        }
-    };
 }
 
 fn forwards_search<W: Write>(
@@ -429,8 +410,9 @@ fn forwards_search<W: Write>(
     search_hits: &mut u64,
     pattern_hits: &mut u64,
     entry_count: &mut u64,
+    error_count: &mut u64,
     pb: Option<ProgressBar>,
-) -> io::Result<()> {
+) {
     let mut search_path = Path::new(&path).to_path_buf();
 
     // accept "." as current directory
@@ -450,24 +432,45 @@ fn forwards_search<W: Write>(
         .filter_entry(|e| file_check(e, &config)); // handle hidden flag
 
     for entry in valid_entries {
-        let entry = entry?;
+        match entry {
+            Ok(entry) => {
+                if !entry.file_type().is_file() {
+                    continue;
+                }
 
-        if !entry.file_type().is_file() {
-            continue;
-        }
+                // count searched entries
+                *entry_count += 1;
 
-        // count searched entries
-        *entry_count += 1;
+                // handle possible file extensions
+                if !config.extensions.is_empty() {
+                    // get entry extension
+                    let mut entry_extension = String::new();
+                    if let Some(extension) = entry.path().extension() {
+                        entry_extension.push_str(&extension.to_string_lossy().to_string());
 
-        // handle possible file extensions
-        if !config.extensions.is_empty() {
-            // get entry extension
-            let mut entry_extension = String::new();
-            if let Some(extension) = entry.path().extension() {
-                entry_extension.push_str(&extension.to_string_lossy().to_string());
-
-                // check if entry_extension matches any given extension via extensions flag
-                if config.extensions.iter().any(|it| &entry_extension == it) {
+                        // check if entry_extension matches any given extension via extensions flag
+                        if config.extensions.iter().any(|it| &entry_extension == it) {
+                            if let Err(err) = match_pattern_and_print(
+                                handle,
+                                &entry.path().to_path_buf(),
+                                &config,
+                                pb.clone(),
+                                search_hits,
+                                pattern_hits,
+                            ) {
+                                match err.kind() {
+                                    io::ErrorKind::Interrupted => {
+                                        warn!("Interrupted: {err}");
+                                        process::exit(0)
+                                    }
+                                    _ => {
+                                        continue;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
                     if let Err(err) = match_pattern_and_print(
                         handle,
                         &entry.path().to_path_buf(),
@@ -488,29 +491,35 @@ fn forwards_search<W: Write>(
                     }
                 }
             }
-        } else {
-            if let Err(err) = match_pattern_and_print(
-                handle,
-                &entry.path().to_path_buf(),
-                &config,
-                pb.clone(),
-                search_hits,
-                pattern_hits,
-            ) {
-                match err.kind() {
-                    io::ErrorKind::Interrupted => {
-                        warn!("Interrupted: {err}");
-                        process::exit(0)
-                    }
-                    _ => {
-                        continue;
+            Err(err) => {
+                // count errors
+                *error_count += 1;
+
+                if config.show_errors_flag {
+                    let path = err.path().unwrap_or(Path::new("")).display();
+                    if let Some(inner) = err.io_error() {
+                        match inner.kind() {
+                            io::ErrorKind::InvalidData => {
+                                warn!("Entry \'{}\' contains invalid data: {}", path, inner)
+                            }
+                            io::ErrorKind::NotFound => {
+                                warn!("Entry \'{}\' not found: {}", path, inner);
+                            }
+                            io::ErrorKind::PermissionDenied => {
+                                warn!("Missing permission to read entry \'{}\': {}", path, inner)
+                            }
+                            _ => {
+                                error!(
+                                    "Failed to access entry: \'{}\'\nUnexpected error occurred: {}",
+                                    path, inner
+                                )
+                            }
+                        }
                     }
                 }
             }
         }
     }
-
-    Ok(())
 }
 
 fn match_pattern_and_print<W: Write>(
@@ -585,12 +594,32 @@ fn match_pattern_and_print<W: Write>(
     Ok(())
 }
 
-fn get_search_hits(search_hits: u64, pattern_hits: u64, entry_count: u64, start: Instant) {
+fn get_search_hits(
+    search_hits: u64,
+    pattern_hits: u64,
+    entry_count: u64,
+    error_count: u64,
+    start: Instant,
+) {
     println!(
         "\n{} {}",
         entry_count.to_string().dimmed(),
         "entries searched".dimmed()
     );
+
+    if error_count == 1 {
+        println!(
+            "{} {}",
+            error_count.to_string().truecolor(250, 0, 104),
+            "error occured".dimmed()
+        );
+    } else if error_count > 1 {
+        println!(
+            "{} {}",
+            error_count.to_string().truecolor(250, 0, 104),
+            "errors occured".dimmed()
+        );
+    }
 
     if search_hits == 0 {
         println!(
