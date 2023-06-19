@@ -1,9 +1,9 @@
 use aho_corasick::{AhoCorasick, AhoCorasickBuilder};
 use clap::{Arg, ArgAction, Command};
-use colored::*;
 use flexi_logger::{detailed_format, Duplicate, FileSpec, Logger};
 use indicatif::{HumanDuration, ProgressBar, ProgressStyle};
 use log::{error, warn};
+use owo_colors::colored::*;
 use walkdir::{DirEntry, WalkDir};
 
 use std::{
@@ -220,7 +220,7 @@ fn mg() -> Command {
             "Note: every set filter slows down the search".truecolor(250, 0, 104)
         ))
         // TODO update version
-        .version("1.2.0")
+        .version("1.2.1")
         .author("Leann Phydon <leann.phydon@gmail.com>")
         .arg_required_else_help(true)
         .arg(
