@@ -1,4 +1,4 @@
-# mg
+# 🔎📝 mg
 
 __Mini Grep__
 
