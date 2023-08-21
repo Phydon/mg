@@ -631,14 +631,25 @@ fn get_search_hits(
             )
         );
     } else if search_hits == 1 {
-        println!(
-            "{}",
-            format!(
-                "found {} file\nfound {} match",
-                search_hits.to_string().truecolor(59, 179, 140).bold(),
-                pattern_hits.to_string().truecolor(59, 179, 140).bold()
-            )
-        );
+        if pattern_hits > 1 {
+            println!(
+                "{}",
+                format!(
+                    "found {} file\nfound {} matches",
+                    search_hits.to_string().truecolor(59, 179, 140).bold(),
+                    pattern_hits.to_string().truecolor(59, 179, 140).bold()
+                )
+            );
+        } else {
+            println!(
+                "{}",
+                format!(
+                    "found {} file\nfound {} match",
+                    search_hits.to_string().truecolor(59, 179, 140).bold(),
+                    pattern_hits.to_string().truecolor(59, 179, 140).bold()
+                )
+            );
+        }
     } else {
         println!(
             "{}",
