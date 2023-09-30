@@ -8,8 +8,8 @@ use walkdir::{DirEntry, WalkDir};
 
 use std::{
     env,
-    fs::{self, File},
-    io::{self, BufReader, Read, Write},
+    fs::{self},
+    io::{self, Write},
     os::windows::prelude::MetadataExt,
     path::{Path, PathBuf},
     process,
@@ -220,7 +220,7 @@ fn mg() -> Command {
             "Note: every set filter slows down the search".truecolor(250, 0, 104)
         ))
         // TODO update version
-        .version("1.2.2")
+        .version("1.2.3")
         .author("Leann Phydon <leann.phydon@gmail.com>")
         .arg_required_else_help(true)
         .arg(
@@ -530,10 +530,7 @@ fn match_pattern_and_print<W: Write>(
     search_hits: &mut u64,
     pattern_hits: &mut u64,
 ) -> io::Result<()> {
-    let file = File::open(path)?;
-    let mut buf_reader = BufReader::with_capacity(BUFFER_CAPACITY, file);
-    let mut content = String::new();
-    buf_reader.read_to_string(&mut content)?;
+    let content = fs::read_to_string(path)?;
 
     // check for pattern match in file via aho-corasick algorithm
     if config.pattern_ac.is_match(&content) {
