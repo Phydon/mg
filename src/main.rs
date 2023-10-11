@@ -98,12 +98,12 @@ fn main() {
 
     // handle arguments
     let matches = mg().get_matches();
+    let mut case_insensitive_flag = matches.get_flag("case-insensitive");
+    let mut count_flag = matches.get_flag("count");
     let mut no_hidden_flag = matches.get_flag("no-hidden");
     let mut performance_flag = matches.get_flag("performance");
-    let mut stats_flag = matches.get_flag("stats");
-    let mut count_flag = matches.get_flag("count");
-    let mut case_insensitive_flag = matches.get_flag("case-insensitive");
     let mut show_errors_flag = matches.get_flag("show-errors");
+    let mut stats_flag = matches.get_flag("stats");
     let override_flag = matches.get_flag("override");
 
     // set default search depth
@@ -120,13 +120,13 @@ fn main() {
 
     // if override flag is set -> reset everything to default values
     if override_flag {
-        no_hidden_flag = false;
-        performance_flag = false;
-        stats_flag = false;
+        case_insensitive_flag = false;
         count_flag = false;
         depth_flag = 250;
-        case_insensitive_flag = false;
+        no_hidden_flag = false;
+        performance_flag = false;
         show_errors_flag = false;
+        stats_flag = false;
     }
 
     if let Some(args) = matches
@@ -135,6 +135,7 @@ fn main() {
     {
         // get search pattern from arguments
         let pattern = vec![args[0].as_str()];
+
         // store search pattern in aho-corasick builder
         // handle case-insensitive flag
         let pattern_ac = AhoCorasickBuilder::new()
