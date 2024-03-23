@@ -221,7 +221,7 @@ fn mg() -> Command {
             "Note: every set filter slows down the search".truecolor(250, 0, 104)
         ))
         // TODO update version
-        .version("1.2.4")
+        .version("1.2.5")
         .author("Leann Phydon <leann.phydon@gmail.com>")
         .arg_required_else_help(true)
         .arg(
@@ -502,29 +502,26 @@ fn forwards_search<W: Write>(
                         match pb.clone() {
                             Some(pb) => {
                                 pb.finish_and_clear();
-
-                                match inner.kind() {
-                                    io::ErrorKind::InvalidData => {
-                                        warn!("Entry \'{}\' contains invalid data: {}", path, inner)
-                                    }
-                                    io::ErrorKind::NotFound => {
-                                        warn!("Entry \'{}\' not found: {}", path, inner);
-                                    }
-                                    io::ErrorKind::PermissionDenied => {
-                                        warn!(
-                                            "Missing permission to read entry \'{}\': {}",
-                                            path, inner
-                                        )
-                                    }
-                                    _ => {
-                                        error!(
-                                            "Failed to access entry: \'{}\'\nUnexpected error occurred: {}",
-                                            path, inner
-                                        )
-                                    }
-                                }
                             }
                             None => {}
+                        }
+
+                        match inner.kind() {
+                            io::ErrorKind::InvalidData => {
+                                warn!("Entry \'{}\' contains invalid data: {}", path, inner)
+                            }
+                            io::ErrorKind::NotFound => {
+                                warn!("Entry \'{}\' not found: {}", path, inner);
+                            }
+                            io::ErrorKind::PermissionDenied => {
+                                warn!("Missing permission to read entry \'{}\': {}", path, inner)
+                            }
+                            _ => {
+                                error!(
+                                    "Failed to access entry: \'{}\'\nUnexpected error occurred: {}",
+                                    path, inner
+                                )
+                            }
                         }
                     }
                 }
