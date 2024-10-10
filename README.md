@@ -6,7 +6,9 @@ __Mini Grep__
 
 * colourful output and search indicating spinner by default 
   * disable via ```--performance``` flag
+* clickable filepaths
 * filter by file-extension
+  * via ```--extension``` flag
 * exclude hidden files
   * via ```--no-hidden``` flag
 * show number of searched entries, search results and search time
@@ -18,6 +20,8 @@ __Mini Grep__
 * set maximum search depth
   * via ```--depth``` flag
 * accepts ```.``` as current directory
+* ignores filesystem errors (e.g. no permission to access file) by default
+  * show errors via ```--show-errors``` flag
 * no regex search (for now)
 
 ## Example
@@ -51,10 +55,11 @@ Options:
   -H, --no-hidden                  Exclude hidden files and directories from search
   -o, --override                   Override all previously set flags
   -p, --performance                Disable spinner, don`t colourize the search output and speed up the output printing
+      --show-errors                Show possible filesystem errors
   -s, --stats                      Show search statistics at the end
   -h, --help                       Print help (see more with '--help')
   -V, --version                    Print version
-```
+ ```
 
 ### Long Usage
 
@@ -62,10 +67,8 @@ Options:
 mg [OPTIONS] [PATTERN] [PATH] [COMMAND]
 
 Commands:
-  log, -L, --log
-          Show content of the log file
-  help
-          Print this message or the help of the given subcommand(s)
+  log, -L, --log  Show content of the log file
+  help            Print this message or the help of the given subcommand(s)
 
 Arguments:
   [PATTERN] [PATH]
@@ -103,6 +106,11 @@ Options:
           Focus on performance
           Disable search indicating spinner and don`t colourize the search output
           Write the output via BufWriter
+
+      --show-errors
+          Show possible filesystem errors
+          For example for situations such as insufficient permissions
+          Cannot be set together with the --stats flag
 
   -s, --stats
           Show search statistics at the end
