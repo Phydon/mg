@@ -215,7 +215,7 @@ fn mg() -> Command {
             "Note: every set filter slows down the search".truecolor(250, 0, 104)
         ))
         // TODO update version
-        .version("1.2.6")
+        .version("1.2.7")
         .author("Leann Phydon <leann.phydon@gmail.com>")
         .arg_required_else_help(true)
         .arg(
@@ -539,12 +539,16 @@ fn match_pattern_and_print<W: Write>(
         *search_hits += 1;
 
         if config.performance_flag {
+            // use "file://" to make filepath clickable in Windows Terminal"
             if !config.count_flag {
-                writeln!(handle, "\n{}", format!("PATH: {}", path.display())).unwrap_or_else(
-                    |err| {
-                        error!("Error writing to stdout: {err}");
-                    },
-                );
+                writeln!(
+                    handle,
+                    "\n{}",
+                    format!("file://{}", path.display().to_string().replace("\\", "/"))
+                )
+                .unwrap_or_else(|err| {
+                    error!("Error writing to stdout: {err}");
+                });
 
                 let mut linenumber = 0;
                 for line in content.lines() {
@@ -560,10 +564,15 @@ fn match_pattern_and_print<W: Write>(
         } else {
             match pb.clone() {
                 Some(pb) => {
+                    // use "file://" to make filepath clickable in Windows Terminal"
                     if !config.count_flag {
                         pb.println(format!(
-                            "\n{}",
-                            path.display().to_string().bold().truecolor(59, 179, 140),
+                            "\nfile://{}",
+                            path.display()
+                                .to_string()
+                                .replace("\\", "/")
+                                .bold()
+                                .truecolor(59, 179, 140),
                         ));
                     }
 
