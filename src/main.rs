@@ -540,7 +540,7 @@ fn match_pattern_and_print<W: Write>(
 
         if config.performance_flag {
             // use "file://" to make filepath clickable in Windows Terminal"
-            // FIXME if a specific file is given in search, the file path is not clickable
+            // FIXME if a specific file is given in search, the file path is not clickable, because the file path is relative and not absolute
             // FIXME e.g.: "mg todo ./test.txt" -> filepath not clickable
             // FIXME "mg todo ." -> filepath clickable
             if !config.count_flag {
